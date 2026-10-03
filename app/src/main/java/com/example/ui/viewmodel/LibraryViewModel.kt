@@ -10,9 +10,14 @@ import com.example.data.model.ReminderChannel
 import com.example.data.model.Student
 import com.example.data.model.SubscriptionStatus
 import com.example.data.repository.StudentRepository
+import com.example.ui.theme.AppAccent
+import com.example.ui.theme.ThemeMode
 import com.example.util.ExcelReportGenerator
 import com.example.util.NotificationHelper
 import com.example.util.PdfReportGenerator
+import com.example.util.DataBackupHelper
+import com.example.util.ImportResult
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -61,6 +66,7 @@ sealed class AppScreen {
     data object ReminderHub : AppScreen()
     data class StudentDetail(val studentId: Long) : AppScreen()
     data class AddEditStudent(val studentId: Long? = null) : AppScreen()
+    data object Settings : AppScreen()
 }
 
 class LibraryViewModel(application: Application) : AndroidViewModel(application) {
@@ -94,8 +100,57 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
     val currentScreen = MutableStateFlow<AppScreen>(AppScreen.Dashboard)
     val navigationStack = mutableListOf<AppScreen>()
 
+    private val themePrefs = application.getSharedPreferences("app_theme_preferences", Context.MODE_PRIVATE)
+
+    val themeMode = MutableStateFlow(
+        when (themePrefs.getString("theme_mode", "SYSTEM")) {
+            "LIGHT" -> ThemeMode.LIGHT
+            "DARK" -> ThemeMode.DARK
+            else -> ThemeMode.SYSTEM
+        }
+    )
+
+    val accentColor = MutableStateFlow(
+        try {
+            AppAccent.valueOf(themePrefs.getString("accent_color", "OCEAN") ?: "OCEAN")
+        } catch (e: Exception) {
+            AppAccent.OCEAN
+        }
+    )
+
+    val showThemeSheet = MutableStateFlow(false)
+
     // Dark mode state: null = system default, true = dark, false = light
-    val darkModeOverride = MutableStateFlow<Boolean?>(null)
+    val darkModeOverride = MutableStateFlow<Boolean?>(
+        when (themePrefs.getString("theme_mode", "SYSTEM")) {
+            "LIGHT" -> false
+            "DARK" -> true
+            else -> null
+        }
+    )
+
+    fun setThemeMode(mode: ThemeMode) {
+        themeMode.value = mode
+        themePrefs.edit().putString("theme_mode", mode.name).apply()
+        darkModeOverride.value = when (mode) {
+            ThemeMode.LIGHT -> false
+            ThemeMode.DARK -> true
+            ThemeMode.SYSTEM -> null
+        }
+    }
+
+    fun setAccentColor(accent: AppAccent) {
+        accentColor.value = accent
+        themePrefs.edit().putString("accent_color", accent.name).apply()
+    }
+
+    fun openThemeSheet() {
+        showThemeSheet.value = true
+    }
+
+    fun closeThemeSheet() {
+        showThemeSheet.value = false
+    }
 
     // Filtered and Sorted Students list
     val filteredStudents: StateFlow<List<Student>> = combine(
@@ -320,24 +375,95 @@ class LibraryViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun exportPdfReport(context: Context): File? {
-        val listToExport = filteredStudents.value
-        val filterName = selectedFilter.value.displayName
-        val file = PdfReportGenerator.generateAndSharePdf(context, listToExport, filterName)
-        if (file != null) {
-            PdfReportGenerator.sharePdfFile(context, file)
+    val isExporting = MutableStateFlow(false)
+
+    fun exportPdfReport(context: Context, onResult: ((File?, Boolean) -> Unit)? = null): File? {
+        if (onResult != null) {
+            isExporting.value = true
+            viewModelScope.launch(Dispatchers.IO) {
+                val listToExport = filteredStudents.value
+                val filterName = selectedFilter.value.displayName
+                val file = PdfReportGenerator.generateAndSharePdf(context, listToExport, filterName)
+                var shared = false
+                if (file != null) {
+                    shared = PdfReportGenerator.sharePdfFile(context, file)
+                }
+                withContext(Dispatchers.Main) {
+                    isExporting.value = false
+                    onResult(file, shared)
+                }
+            }
+            return null
+        } else {
+            val listToExport = filteredStudents.value
+            val filterName = selectedFilter.value.displayName
+            val file = PdfReportGenerator.generateAndSharePdf(context, listToExport, filterName)
+            if (file != null) {
+                PdfReportGenerator.sharePdfFile(context, file)
+            }
+            return file
         }
-        return file
     }
 
-    fun exportExcelReport(context: Context): File? {
-        val listToExport = filteredStudents.value
-        val filterName = selectedFilter.value.displayName
-        val file = ExcelReportGenerator.generateExcelFile(context, listToExport, filterName)
-        if (file != null) {
-            ExcelReportGenerator.shareExcelFile(context, file)
+    fun exportExcelReport(context: Context, onResult: ((File?, Boolean) -> Unit)? = null): File? {
+        if (onResult != null) {
+            isExporting.value = true
+            viewModelScope.launch(Dispatchers.IO) {
+                val listToExport = filteredStudents.value
+                val filterName = selectedFilter.value.displayName
+                val file = ExcelReportGenerator.generateExcelFile(context, listToExport, filterName)
+                var shared = false
+                if (file != null) {
+                    shared = ExcelReportGenerator.shareExcelFile(context, file)
+                }
+                withContext(Dispatchers.Main) {
+                    isExporting.value = false
+                    onResult(file, shared)
+                }
+            }
+            return null
+        } else {
+            val listToExport = filteredStudents.value
+            val filterName = selectedFilter.value.displayName
+            val file = ExcelReportGenerator.generateExcelFile(context, listToExport, filterName)
+            if (file != null) {
+                ExcelReportGenerator.shareExcelFile(context, file)
+            }
+            return file
         }
-        return file
+    }
+
+    /**
+     * Exports all user data into a single ZIP archive containing database Excel CSV and photos folder.
+     */
+    fun exportFullBackup(context: Context, onResult: (File?, Boolean) -> Unit) {
+        if (isExporting.value) return
+        isExporting.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val students = allStudents.value
+            val (zipFile, shared) = DataBackupHelper.exportAllUserDataToZip(context, students)
+            withContext(Dispatchers.Main) {
+                isExporting.value = false
+                onResult(zipFile, shared)
+            }
+        }
+    }
+
+    val isImporting = MutableStateFlow(false)
+
+    /**
+     * Imports student records and photos from a user-selected ZIP or CSV archive.
+     */
+    fun importUserData(context: Context, sourceUri: Uri, onResult: (ImportResult) -> Unit) {
+        if (isImporting.value) return
+        isImporting.value = true
+        viewModelScope.launch(Dispatchers.IO) {
+            val result = DataBackupHelper.importUserData(context, sourceUri, repository)
+            withContext(Dispatchers.Main) {
+                isImporting.value = false
+                onResult(result)
+            }
+        }
     }
 
     val isSeeding5k = MutableStateFlow(false)

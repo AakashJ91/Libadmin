@@ -206,4 +206,39 @@ class ExampleRobolectricTest {
 
         db.close()
     }
+
+    @Test
+    fun `test theme modes and accent palettes generation`() {
+        com.example.ui.theme.AppAccent.values().forEach { accent ->
+            val lightScheme = com.example.ui.theme.getLightColorSchemeForAccent(accent)
+            val darkScheme = com.example.ui.theme.getDarkColorSchemeForAccent(accent)
+
+            assertEquals(accent.lightPrimary, lightScheme.primary)
+            assertEquals(accent.darkPrimary, darkScheme.primary)
+        }
+    }
+
+    @Test
+    fun `test student photoUri property persistence`() {
+        val studentWithPhoto = Student(
+            id = 99,
+            name = "Sarah Connor",
+            phone = "1234567890",
+            email = "sarah@example.com",
+            idProofNumber = "LIB-PHOTO-99",
+            address = "Tech City",
+            avatarKey = "avatar_2",
+            photoUri = "/data/user/0/com.example/files/student_photos/student_test.jpg",
+            shift = "Full Day",
+            planType = "1 Month",
+            startDateMillis = 1000L,
+            endDateMillis = 5000L
+        )
+
+        assertEquals("/data/user/0/com.example/files/student_photos/student_test.jpg", studentWithPhoto.photoUri)
+        val entity = com.example.data.db.StudentEntity.fromDomain(studentWithPhoto)
+        assertEquals("/data/user/0/com.example/files/student_photos/student_test.jpg", entity.photoUri)
+        val restored = entity.toDomain()
+        assertEquals(studentWithPhoto.photoUri, restored.photoUri)
+    }
 }

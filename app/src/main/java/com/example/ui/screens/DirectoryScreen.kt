@@ -19,6 +19,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -34,14 +37,18 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -88,6 +95,7 @@ import com.example.data.model.ReminderChannel
 import com.example.data.model.Student
 import com.example.data.model.SubscriptionStatus
 import com.example.ui.components.StudentCard
+import com.example.ui.components.StudentGridCard
 import com.example.ui.theme.StatusActive
 import com.example.ui.theme.StatusExpired
 import com.example.ui.theme.StatusExpiringSoon
@@ -110,6 +118,8 @@ fun DirectoryScreen(
 ) {
     val context = LocalContext.current
     var sortMenuExpanded by remember { mutableStateOf(false) }
+    var exportMenuExpanded by remember { mutableStateOf(false) }
+    var isGridView by remember { mutableStateOf(false) }
 
     // Multi-selection state
     var isSelectionMode by remember { mutableStateOf(false) }
@@ -206,87 +216,150 @@ fun DirectoryScreen(
                 // Regular Top App Bar
                 TopAppBar(
                     title = {
-                        Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = "Students & Fee Roster",
+                                text = "Students",
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
+                                fontSize = 17.5.sp,
+                                maxLines = 1
                             )
-                            Text(
-                                text = "${students.size} of $totalRegistered registered students",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                            ) {
+                                Text(
+                                    text = "${students.size}",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
                         }
                     },
                     actions = {
+                        // View Mode Toggle (Grid vs List)
+                        IconButton(
+                            onClick = { isGridView = !isGridView },
+                            modifier = Modifier
+                                .size(34.dp)
+                                .testTag("btn_toggle_view_mode")
+                        ) {
+                            Icon(
+                                imageVector = if (isGridView) Icons.Default.ViewList else Icons.Default.GridView,
+                                contentDescription = if (isGridView) "Switch to List View" else "Switch to Grid View",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+
                         // Enter Multi-Select Mode Button
                         IconButton(
                             onClick = { isSelectionMode = true },
-                            modifier = Modifier.testTag("btn_enter_multiselect")
+                            modifier = Modifier
+                                .size(34.dp)
+                                .testTag("btn_enter_multiselect")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Checklist,
                                 contentDescription = "Multi-Select Students",
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(19.dp)
                             )
                         }
 
-                        // Export Excel Sheet Button
-                        FilledTonalButton(
-                            onClick = {
-                                val file = viewModel.exportExcelReport(context)
-                                if (file != null) {
-                                    Toast.makeText(context, "Exported Excel Sheet: ${file.name}", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "Failed to export Excel sheet", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier
-                                .padding(end = 4.dp)
-                                .testTag("btn_export_excel_roster"),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.TableChart,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Excel", fontSize = 12.sp)
-                        }
+                        // Export Roster (Excel / PDF) dropdown menu button
+                        Box {
+                            IconButton(
+                                onClick = { exportMenuExpanded = true },
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .testTag("btn_export_roster_menu")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = "Export Roster",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(19.dp)
+                                )
+                            }
 
-                        // Export PDF Button
-                        Button(
-                            onClick = {
-                                val file = viewModel.exportPdfReport(context)
-                                if (file != null) {
-                                    Toast.makeText(context, "Exported PDF: ${file.name}", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "Failed to export PDF", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier
-                                .padding(end = 4.dp)
-                                .testTag("btn_export_pdf_roster"),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PictureAsPdf,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("PDF", fontSize = 12.sp)
+                            DropdownMenu(
+                                expanded = exportMenuExpanded,
+                                onDismissRequest = { exportMenuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.TableChart,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    text = { Text("Export Excel Sheet (.csv)") },
+                                    onClick = {
+                                        exportMenuExpanded = false
+                                        viewModel.exportExcelReport(context) { file, shared ->
+                                            if (file != null) {
+                                                if (shared) {
+                                                    Toast.makeText(context, "Excel exported: ${file.name}", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "Saved report: ${file.name}", Toast.LENGTH_SHORT).show()
+                                                }
+                                            } else {
+                                                Toast.makeText(context, "Failed to export Excel sheet", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.testTag("btn_export_excel_roster")
+                                )
+
+                                DropdownMenuItem(
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = Icons.Default.PictureAsPdf,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    },
+                                    text = { Text("Export PDF Report") },
+                                    onClick = {
+                                        exportMenuExpanded = false
+                                        viewModel.exportPdfReport(context) { file, shared ->
+                                            if (file != null) {
+                                                if (shared) {
+                                                    Toast.makeText(context, "PDF exported: ${file.name}", Toast.LENGTH_SHORT).show()
+                                                } else {
+                                                    Toast.makeText(context, "Saved report: ${file.name}", Toast.LENGTH_SHORT).show()
+                                                }
+                                            } else {
+                                                Toast.makeText(context, "Failed to export PDF", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.testTag("btn_export_pdf_roster")
+                                )
+                            }
                         }
 
                         // Sort menu button
                         Box {
                             IconButton(
                                 onClick = { sortMenuExpanded = true },
-                                modifier = Modifier.testTag("btn_sort_roster")
+                                modifier = Modifier
+                                    .size(34.dp)
+                                    .testTag("btn_sort_roster")
                             ) {
-                                Icon(imageVector = Icons.Default.Sort, contentDescription = "Sort")
+                                Icon(
+                                    imageVector = Icons.Default.Sort,
+                                    contentDescription = "Sort",
+                                    modifier = Modifier.size(19.dp)
+                                )
                             }
 
                             DropdownMenu(
@@ -308,33 +381,6 @@ fun DirectoryScreen(
                                         }
                                     )
                                 }
-
-                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-
-                                // 5k Scale Test Option
-                                DropdownMenuItem(
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Speed,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    },
-                                    text = {
-                                        Text(
-                                            text = "⚡ Seed 5,000 Members (Scale Test)",
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    },
-                                    onClick = {
-                                        sortMenuExpanded = false
-                                        viewModel.populate5kUsersBenchmark {
-                                            Toast.makeText(context, "Successfully seeded 5,000 members!", Toast.LENGTH_LONG).show()
-                                        }
-                                    }
-                                )
 
                                 if (totalRegistered > 10) {
                                     DropdownMenuItem(
@@ -568,6 +614,54 @@ fun DirectoryScreen(
                         }
                     }
                 }
+            } else if (isGridView) {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("scrollable_students_grid"),
+                    contentPadding = PaddingValues(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(
+                        items = students,
+                        key = { it.id },
+                        contentType = { "student_grid_card" }
+                    ) { student ->
+                        val isStudentSelected = selectedIds.contains(student.id)
+                        StudentGridCard(
+                            student = student,
+                            onClick = {
+                                if (isSelectionMode) {
+                                    if (isStudentSelected) selectedIds.remove(student.id) else selectedIds.add(student.id)
+                                } else {
+                                    onNavigate(AppScreen.StudentDetail(student.id))
+                                }
+                            },
+                            onWhatsAppClick = {
+                                viewModel.dispatchReminder(context, student, ReminderChannel.WHATSAPP)
+                            },
+                            onSmsClick = {
+                                viewModel.dispatchReminder(context, student, ReminderChannel.SMS)
+                            },
+                            onCallClick = {
+                                NotificationHelper.openDialer(context, student.phone)
+                            },
+                            isSelectionMode = isSelectionMode,
+                            isSelected = isStudentSelected,
+                            onToggleSelect = {
+                                if (isStudentSelected) selectedIds.remove(student.id) else selectedIds.add(student.id)
+                            },
+                            onLongClick = {
+                                if (!isSelectionMode) {
+                                    isSelectionMode = true
+                                    selectedIds.add(student.id)
+                                }
+                            }
+                        )
+                    }
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier
@@ -728,47 +822,61 @@ private fun StatusPill(
     onClick: () -> Unit
 ) {
     Surface(
-        color = if (isSelected) color.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surface,
-        border = if (isSelected) BorderStroke(1.5.dp, color.copy(alpha = 0.6f)) else null,
-        shape = RoundedCornerShape(16.dp),
-        shadowElevation = if (isSelected) 1.5.dp else 0.5.dp,
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = if (isSelected) color.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+        border = BorderStroke(
+            width = if (isSelected) 1.5.dp else 1.dp,
+            color = if (isSelected) color else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+        ),
+        shadowElevation = 0.dp,
         modifier = modifier
-            .clickable(onClick = onClick)
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 9.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(18.dp)
+                        .size(20.dp)
                         .clip(CircleShape)
-                        .background(color.copy(alpha = 0.15f)),
+                        .background(if (isSelected) color else color.copy(alpha = 0.12f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = color,
-                        modifier = Modifier.size(11.dp)
+                        tint = if (isSelected) Color.White else color,
+                        modifier = Modifier.size(12.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
                     text = "$count",
-                    fontSize = 13.5.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = if (isSelected) color else MaterialTheme.colorScheme.onSurface
                 )
             }
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(3.dp))
             Text(
                 text = label,
-                fontSize = 9.5.sp,
+                fontSize = 10.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (isSelected) color else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Box(
+                modifier = Modifier
+                    .width(18.dp)
+                    .height(2.5.dp)
+                    .clip(RoundedCornerShape(1.5.dp))
+                    .background(if (isSelected) color else Color.Transparent)
             )
         }
     }

@@ -15,8 +15,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,12 +28,15 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.AppBottomNav
+import com.example.ui.components.ThemeSelectionSheet
 import com.example.ui.screens.AddEditStudentScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.DirectoryScreen
 import com.example.ui.screens.ReminderHubScreen
+import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.StudentDetailScreen
 import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.theme.ThemeMode
 import com.example.ui.viewmodel.AppScreen
 import com.example.ui.viewmodel.FilterType
 import com.example.ui.viewmodel.LibraryViewModel
@@ -74,13 +79,34 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Dark Mode handling
-            val darkModeOverride by libraryViewModel.darkModeOverride.collectAsStateWithLifecycle()
-            val systemDark = isSystemInDarkTheme()
-            val isDarkTheme = darkModeOverride ?: systemDark
+            // Theme & Accent handling
+            val themeMode by libraryViewModel.themeMode.collectAsStateWithLifecycle()
+            val accentColor by libraryViewModel.accentColor.collectAsStateWithLifecycle()
+            val showThemeSheet by libraryViewModel.showThemeSheet.collectAsStateWithLifecycle()
 
-            MyApplicationTheme(darkTheme = isDarkTheme) {
-                MainAppContent(viewModel = libraryViewModel, isDarkTheme = isDarkTheme)
+            val systemDark = isSystemInDarkTheme()
+            val isDarkTheme = when (themeMode) {
+                ThemeMode.SYSTEM -> systemDark
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+
+            MyApplicationTheme(themeMode = themeMode, accent = accentColor) {
+                MainAppContent(
+                    viewModel = libraryViewModel,
+                    isDarkTheme = isDarkTheme,
+                    onOpenThemeSettings = { libraryViewModel.openThemeSheet() }
+                )
+
+                if (showThemeSheet) {
+                    ThemeSelectionSheet(
+                        currentMode = themeMode,
+                        currentAccent = accentColor,
+                        onModeSelect = { libraryViewModel.setThemeMode(it) },
+                        onAccentSelect = { libraryViewModel.setAccentColor(it) },
+                        onDismiss = { libraryViewModel.closeThemeSheet() }
+                    )
+                }
             }
         }
     }
@@ -89,7 +115,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainAppContent(
     viewModel: LibraryViewModel,
-    isDarkTheme: Boolean
+    isDarkTheme: Boolean,
+    onOpenThemeSettings: () -> Unit = {}
 ) {
     val currentScreen by viewModel.currentScreen.collectAsStateWithLifecycle()
     val allStudents by viewModel.allStudents.collectAsStateWithLifecycle()
@@ -111,6 +138,7 @@ fun MainAppContent(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         bottomBar = {
             if (isTopLevel) {
                 AppBottomNav(
@@ -126,7 +154,7 @@ fun MainAppContent(
             transitionSpec = { fadeIn() togetherWith fadeOut() },
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = if (isTopLevel) innerPadding.calculateBottomPadding() else innerPadding.calculateBottomPadding()),
+                .padding(bottom = if (isTopLevel) innerPadding.calculateBottomPadding() else 0.dp),
             label = "ScreenTransition"
         ) { screen ->
             when (screen) {
@@ -136,7 +164,8 @@ fun MainAppContent(
                         metrics = metrics,
                         students = allStudents,
                         isDarkTheme = isDarkTheme,
-                        onToggleDarkTheme = { viewModel.toggleDarkMode() },
+                        onToggleDarkTheme = onOpenThemeSettings,
+                        onOpenThemeSettings = onOpenThemeSettings,
                         onNavigate = { viewModel.navigateTo(it) }
                     )
                 }
@@ -169,6 +198,12 @@ fun MainAppContent(
                 is AppScreen.AddEditStudent -> {
                     AddEditStudentScreen(
                         studentId = screen.studentId,
+                        viewModel = viewModel,
+                        onBack = { viewModel.navigateBack() }
+                    )
+                }
+                is AppScreen.Settings -> {
+                    SettingsScreen(
                         viewModel = viewModel,
                         onBack = { viewModel.navigateBack() }
                     )

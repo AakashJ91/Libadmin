@@ -1,6 +1,10 @@
 package com.example.ui.screens
 
+import android.net.Uri
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -11,34 +15,46 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -59,6 +75,8 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.Student
 import com.example.ui.components.StudentAvatar
 import com.example.ui.viewmodel.LibraryViewModel
+import com.example.util.ImageStorageHelper
+import com.example.util.AppSettingsManager
 import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,6 +102,32 @@ fun AddEditStudentScreen(
     var emergencyContact by remember { mutableStateOf(existing?.emergencyContact ?: "") }
     var notes by remember { mutableStateOf(existing?.notes ?: "") }
     var avatarKey by remember { mutableStateOf(existing?.avatarKey ?: "avatar_1") }
+    var photoUri by remember { mutableStateOf(existing?.photoUri) }
+    var showPhotoSourceDialog by remember { mutableStateOf(false) }
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val savedPath = ImageStorageHelper.savePhotoFromUri(context, uri)
+            if (savedPath != null) {
+                photoUri = savedPath
+                Toast.makeText(context, "Student photo attached!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            val savedPath = ImageStorageHelper.saveBitmap(context, bitmap)
+            if (savedPath != null) {
+                photoUri = savedPath
+                Toast.makeText(context, "Student photo captured!", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     var selectedShift by remember {
         mutableStateOf(existing?.shift ?: "Full Day (6 AM - 10 PM)")
@@ -111,10 +155,10 @@ fun AddEditStudentScreen(
     var customDays by remember { mutableStateOf("15") }
 
     var feeAmount by remember {
-        mutableStateOf(existing?.feeAmount?.toInt()?.toString() ?: "1000")
+        mutableStateOf(existing?.feeAmount?.toInt()?.toString() ?: AppSettingsManager.getDefaultFee(context, selectedPlan).toInt().toString())
     }
     var feePaid by remember {
-        mutableStateOf(existing?.feePaid?.toInt()?.toString() ?: "1000")
+        mutableStateOf(existing?.feePaid?.toInt()?.toString() ?: feeAmount)
     }
 
     val avatarKeys = listOf("avatar_1", "avatar_2", "avatar_3", "avatar_4", "avatar_5", "avatar_6")
@@ -138,13 +182,14 @@ fun AddEditStudentScreen(
                 )
             )
         },
-        modifier = modifier
+        modifier = modifier.imePadding(),
+        contentWindowInsets = WindowInsets.statusBars
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 120.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Profile & Avatar Section
@@ -158,15 +203,108 @@ fun AddEditStudentScreen(
                         modifier = Modifier.padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        StudentAvatar(
-                            name = name.ifBlank { "New" },
-                            avatarKey = avatarKey,
-                            sizeDp = 64
-                        )
+                        // Interactive Avatar with Camera Badge
+                        Box(
+                            contentAlignment = Alignment.BottomEnd,
+                            modifier = Modifier.padding(4.dp)
+                        ) {
+                            Surface(
+                                shape = CircleShape,
+                                shadowElevation = 2.dp,
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .clickable { showPhotoSourceDialog = true }
+                            ) {
+                                StudentAvatar(
+                                    name = name.ifBlank { "New" },
+                                    avatarKey = avatarKey,
+                                    photoUri = photoUri,
+                                    sizeDp = 92
+                                )
+                            }
+
+                            // Camera badge overlay button
+                            Surface(
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                shadowElevation = 3.dp,
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .clickable { showPhotoSourceDialog = true }
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.CameraAlt,
+                                        contentDescription = "Upload or Take Photo",
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Dual Action Buttons: Camera & Gallery
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            FilledTonalButton(
+                                onClick = { cameraLauncher.launch(null) },
+                                modifier = Modifier.testTag("btn_take_student_photo"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CameraAlt,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Camera", fontSize = 12.sp)
+                            }
+
+                            FilledTonalButton(
+                                onClick = {
+                                    photoPickerLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                },
+                                modifier = Modifier.testTag("btn_pick_student_photo"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PhotoLibrary,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Gallery", fontSize = 12.sp)
+                            }
+
+                            if (photoUri != null) {
+                                OutlinedButton(
+                                    onClick = { photoUri = null },
+                                    modifier = Modifier.testTag("btn_remove_student_photo"),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Remove", fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Select Avatar Tone",
-                            fontSize = 12.sp,
+                            text = if (photoUri != null) "Student photo attached (Tap photo to change)" else "Snap photo with camera or choose from gallery",
+                            fontSize = 11.5.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -338,13 +476,11 @@ fun AddEditStudentScreen(
                                     selected = isSelected,
                                     onClick = {
                                         selectedPlan = planLabel
-                                        when (planLabel) {
-                                            "1 Week" -> feeAmount = "400"
-                                            "1 Month" -> feeAmount = "1000"
-                                            "3 Months" -> feeAmount = "2700"
-                                            "6 Months" -> feeAmount = "5000"
+                                        if (existing == null && planLabel != "Custom") {
+                                            val defFee = AppSettingsManager.getDefaultFee(context, planLabel)
+                                            feeAmount = defFee.toInt().toString()
+                                            feePaid = feeAmount
                                         }
-                                        feePaid = feeAmount
                                     },
                                     label = { Text(planLabel, fontSize = 11.sp) }
                                 )
@@ -430,6 +566,7 @@ fun AddEditStudentScreen(
                             idProofNumber = idProofNumber.trim(),
                             address = address.trim(),
                             avatarKey = avatarKey,
+                            photoUri = photoUri,
                             shift = selectedShift,
                             planType = selectedPlan,
                             startDateMillis = start,
@@ -460,5 +597,79 @@ fun AddEditStudentScreen(
                 Spacer(modifier = Modifier.height(20.dp))
             }
         }
+    }
+
+    if (showPhotoSourceDialog) {
+        AlertDialog(
+            onDismissRequest = { showPhotoSourceDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CameraAlt,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Student Photo",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text("Capture a clear profile photo with your camera or select an existing picture from your device gallery.")
+            },
+            confirmButton = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FilledTonalButton(
+                        onClick = {
+                            showPhotoSourceDialog = false
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        modifier = Modifier.testTag("dialog_btn_gallery")
+                    ) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Gallery")
+                    }
+
+                    Button(
+                        onClick = {
+                            showPhotoSourceDialog = false
+                            cameraLauncher.launch(null)
+                        },
+                        modifier = Modifier.testTag("dialog_btn_camera")
+                    ) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Camera")
+                    }
+                }
+            },
+            dismissButton = {
+                if (photoUri != null) {
+                    OutlinedButton(
+                        onClick = {
+                            photoUri = null
+                            showPhotoSourceDialog = false
+                        },
+                        modifier = Modifier.testTag("dialog_btn_remove")
+                    ) {
+                        Text("Remove", color = MaterialTheme.colorScheme.error)
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { showPhotoSourceDialog = false }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        )
     }
 }

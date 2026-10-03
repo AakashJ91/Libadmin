@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Message
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -32,6 +33,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -54,6 +56,7 @@ import com.example.data.model.ReminderChannel
 import com.example.data.model.Student
 import com.example.data.model.SubscriptionStatus
 import com.example.ui.components.StatusBadge
+import com.example.ui.components.StudentAvatar
 import com.example.ui.theme.StatusActive
 import com.example.ui.theme.StatusExpired
 import com.example.ui.theme.StatusExpiringSoon
@@ -94,6 +97,18 @@ fun ReminderHubScreen(
                             text = "Push Alerts, WhatsApp, SMS & Email Notifications",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.openThemeSheet() },
+                        modifier = Modifier.testTag("btn_reminder_hub_theme")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Palette,
+                            contentDescription = "Theme & Accent Settings",
+                            tint = MaterialTheme.colorScheme.primary
                         )
                     }
                 },
@@ -214,6 +229,13 @@ fun ReminderHubScreen(
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                StudentAvatar(
+                                    name = student.name,
+                                    avatarKey = student.avatarKey,
+                                    photoUri = student.photoUri,
+                                    sizeDp = 42
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = student.name,

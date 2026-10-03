@@ -134,24 +134,18 @@ object NotificationHelper {
      * Formats WhatsApp message and launches WhatsApp intent.
      */
     fun openWhatsAppReminder(context: Context, student: Student) {
-        val days = student.daysRemaining()
-        val expiryPhrase = when {
-            days < 0 -> "expired ${-days} day(s) ago on ${student.formattedEndDate()}"
-            days == 0 -> "expires TODAY (${student.formattedEndDate()})"
-            else -> "is expiring in $days day(s) on ${student.formattedEndDate()}"
-        }
+        val template = AppSettingsManager.getNotificationTemplate(context)
+        val customMsg = AppSettingsManager.formatMessage(template, student)
 
         val message = """
-            📚 *LibAdmin Reading Library - Access Renewal Notice*
+            📚 *LibAdmin Reading Library - Notification*
             
-            Hello *${student.name}*,
+            $customMsg
             
-            Your reading library access (*${student.shift}*) $expiryPhrase.
-            
+            Shift: ${student.shift}
             Plan: ${student.planType}
-            ${if (student.isPendingFee) "⚠️ Pending Dues: ₹${String.format("%.2f", student.pendingFeeAmount)}\n" else ""}
-            Please renew your access promptly to maintain uninterrupted access to the reading hall.
-            
+            Expiry: ${student.formattedEndDate()}
+            ${if (student.isPendingFee) "⚠️ Pending Dues: ₹${String.format(java.util.Locale.US, "%.2f", student.pendingFeeAmount)}\n" else ""}
             Regards,
             Library Administration Team
         """.trimIndent()
@@ -184,8 +178,8 @@ object NotificationHelper {
      * Launches SMS composer with pre-filled reminder text.
      */
     fun openSmsReminder(context: Context, student: Student) {
-        val days = student.daysRemaining()
-        val text = "LibAdmin Notice: Hi ${student.name}, your reading library access expires on ${student.formattedEndDate()} (${if (days < 0) "Expired" else "$days days left"}). Please renew to keep your access active. LibAdmin Desk."
+        val template = AppSettingsManager.getNotificationTemplate(context)
+        val text = AppSettingsManager.formatMessage(template, student)
 
         val intent = Intent(Intent.ACTION_SENDTO).apply {
             data = Uri.parse("smsto:${student.phone.replace(Regex("[^0-9+]"), "")}")

@@ -150,28 +150,33 @@ object ExcelReportGenerator {
     /**
      * Shares or opens the exported Excel spreadsheet via Android Intent chooser.
      */
-    fun shareExcelFile(context: Context, file: File) {
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
-        )
+    fun shareExcelFile(context: Context, file: File): Boolean {
+        return try {
+            val authority = "${context.packageName}.fileprovider"
+            val uri = FileProvider.getUriForFile(context, authority, file)
 
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/csv"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "LibAdmin - Students & Fee Roster")
-            putExtra(
-                Intent.EXTRA_TEXT,
-                "Please find attached the exported LibAdmin registered students roster with current fee status and expiry dates."
-            )
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/csv"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = android.content.ClipData.newRawUri("LibAdmin Excel", uri)
+                putExtra(Intent.EXTRA_SUBJECT, "LibAdmin - Students & Fee Roster")
+                putExtra(
+                    Intent.EXTRA_TEXT,
+                    "Please find attached the exported LibAdmin registered students roster with current fee status and expiry dates."
+                )
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
 
-        val chooser = Intent.createChooser(intent, "Open / Share Excel Sheet").apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            val chooser = Intent.createChooser(intent, "Open / Share Excel Sheet").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(chooser)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sharing Excel file", e)
+            false
         }
-        context.startActivity(chooser)
     }
 
     /**

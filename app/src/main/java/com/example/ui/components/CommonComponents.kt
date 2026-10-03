@@ -125,16 +125,17 @@ fun StudentAvatar(
     sizeDp: Int = 46,
     shape: Shape = CircleShape
 ) {
-    if (!photoUri.isNullOrBlank() && File(photoUri).exists()) {
+    val isFileValid = !photoUri.isNullOrBlank() && (photoUri.startsWith("content:") || File(photoUri).exists())
+    if (isFileValid) {
         Box(
             modifier = modifier
                 .size(sizeDp.dp)
                 .clip(shape)
-                .border(1.5.dp, MaterialTheme.colorScheme.surface, shape),
+                .border(1.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f), shape),
             contentAlignment = Alignment.Center
         ) {
             AsyncImage(
-                model = File(photoUri),
+                model = if (photoUri!!.startsWith("/")) File(photoUri) else photoUri,
                 contentDescription = "$name's photo",
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()

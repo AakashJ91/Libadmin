@@ -96,10 +96,14 @@ object PdfReportGenerator {
         val now = System.currentTimeMillis()
         val dateStr = SimpleDateFormat("MMM dd, yyyy - hh:mm a", Locale.getDefault()).format(Date(now))
 
-        val rowsPerPage = 18
-        val totalPages = maxOf(1, ((students.size + rowsPerPage - 1) / rowsPerPage))
+        val maxPdfStudents = 250
+        val studentsForPdf = if (students.size > maxPdfStudents) students.take(maxPdfStudents) else students
 
-        for (pageIndex in 0 until totalPages) {
+        val rowsPerPage = 18
+        val totalPages = maxOf(1, ((studentsForPdf.size + rowsPerPage - 1) / rowsPerPage))
+
+        return try {
+            for (pageIndex in 0 until totalPages) {
             val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageIndex + 1).create()
             val page = pdfDocument.startPage(pageInfo)
             val canvas: Canvas = page.canvas
@@ -176,11 +180,11 @@ object PdfReportGenerator {
 
             // Table Rows
             val startIndex = pageIndex * rowsPerPage
-            val endIndex = minOf(students.size, startIndex + rowsPerPage)
+            val endIndex = minOf(studentsForPdf.size, startIndex + rowsPerPage)
             val rowHeight = 24f
 
             for (i in startIndex until endIndex) {
-                val student = students[i]
+                val student = studentsForPdf[i]
                 val rowRect = RectF(tableLeft, currentY, tableRight, currentY + rowHeight)
 
                 if (i % 2 == 1) {
@@ -253,20 +257,21 @@ object PdfReportGenerator {
             pdfDocument.finishPage(page)
         }
 
-        val reportsDir = File(context.cacheDir, "reports").apply { mkdirs() }
-        val fileName = "LibAdmin_Report_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.pdf"
-        val outputFile = File(reportsDir, fileName)
+            val reportsDir = File(context.cacheDir, "reports").apply { mkdirs() }
+            val fileName = "LibAdmin_Report_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.pdf"
+            val outputFile = File(reportsDir, fileName)
 
-        return try {
-            val outputStream = FileOutputStream(outputFile)
-            pdfDocument.writeTo(outputStream)
-            outputStream.flush()
-            outputStream.close()
+            FileOutputStream(outputFile).use { outputStream ->
+                pdfDocument.writeTo(outputStream)
+                outputStream.flush()
+            }
             pdfDocument.close()
             outputFile
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             e.printStackTrace()
-            pdfDocument.close()
+            try {
+                pdfDocument.close()
+            } catch (_: Exception) {}
             null
         }
     }
@@ -303,25 +308,34 @@ object PdfReportGenerator {
         canvas.drawText(value, x + 6f, y + 26f, valPaint)
     }
 
-    fun sharePdfFile(context: Context, pdfFile: File) {
-        val uri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            pdfFile
-        )
+    fun sharePdfFile(context: Context, pdfFile: File): Boolean {
+        return try {
+            val authority = "${context.packageName}.fileprovider"
+            val uri = FileProvider.getUriForFile(
+                context,
+                authority,
+                pdfFile
+            )
 
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/pdf"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "LibAdmin Student & Expiry Report")
-            putExtra(Intent.EXTRA_TEXT, "Attached is the latest Library Student Access & Expiry Report.")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = android.content.ClipData.newRawUri("LibAdmin PDF", uri)
+                putExtra(Intent.EXTRA_SUBJECT, "LibAdmin Student & Expiry Report")
+                putExtra(Intent.EXTRA_TEXT, "Attached is the latest Library Student Access & Expiry Report.")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
 
-        val chooser = Intent.createChooser(intent, "Share Library PDF Report").apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            val chooser = Intent.createChooser(intent, "Share Library PDF Report").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(chooser)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
         }
-        context.startActivity(chooser)
     }
 
     fun viewPdfFile(context: Context, pdfFile: File) {
