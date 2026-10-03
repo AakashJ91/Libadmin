@@ -1,0 +1,6 @@
+{
+  "name": "LibAdmin - Library Manager",
+  "description": "Reading library administration app to manage student enrollments, seat reservations, subscriptions, automated expiry alerts, and export PDF records.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

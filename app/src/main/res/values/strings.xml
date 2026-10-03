@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">LibAdmin</string>
+    <string name="channel_expiry_name">Subscription Expiry Alerts</string>
+    <string name="channel_expiry_desc">Notifications when library student memberships are near expiry</string>
+</resources>

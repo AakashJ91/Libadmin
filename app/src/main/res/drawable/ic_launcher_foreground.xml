@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Group centered strictly within safe zone (radius 33, center 54,54) -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54">
+        <!-- Circular soft glow backdrop -->
+        <path
+            android:fillColor="#1AFFFFFF"
+            android:pathData="M54,26 A28,28 0 1 0 54,82 A28,28 0 1 0 54,26 Z" />
+
+        <!-- Desk Lamp / Beacon top glow -->
+        <path
+            android:fillColor="#FBBF24"
+            android:pathData="M48,27 C48,25 60,25 60,27 L64,33 L44,33 Z" />
+        <path
+            android:fillColor="#F59E0B"
+            android:pathData="M52,33 L56,33 L55,38 L53,38 Z" />
+
+        <!-- Open Book Left Page -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M52,44 C44,40 34,41 28,45 L28,69 C34,65 44,64 52,68 Z" />
+
+        <!-- Open Book Right Page -->
+        <path
+            android:fillColor="#F3F4F6"
+            android:pathData="M56,44 C64,40 74,41 80,45 L80,69 C74,65 64,64 56,68 Z" />
+
+        <!-- Book spine / center fold -->
+        <path
+            android:fillColor="#D97706"
+            android:pathData="M52.5,44 L55.5,44 L55.5,69 L52.5,69 Z" />
+
+        <!-- Left Page lines -->
+        <path
+            android:fillColor="#93C5FD"
+            android:pathData="M33,49 L48,46 L48,47.5 L33,50.5 Z M33,54 L48,51 L48,52.5 L33,55.5 Z M33,59 L46,56.5 L46,58 L33,60.5 Z" />
+
+        <!-- Right Page lines -->
+        <path
+            android:fillColor="#93C5FD"
+            android:pathData="M60,46 L75,49 L75,50.5 L60,47.5 Z M60,51 L75,54 L75,55.5 L60,52.5 Z M62,56.5 L75,59 L75,60.5 L62,58 Z" />
+
+        <!-- Bookmark ribbon in vibrant red-amber -->
+        <path
+            android:fillColor="#EF4444"
+            android:pathData="M53,44 L55,44 L55,73 L54,71 L53,73 Z" />
+
+        <!-- Seat / Desk indicator badge -->
+        <path
+            android:fillColor="#38BDF8"
+            android:pathData="M44,74 L64,74 C65,74 66,75 66,76 L66,78 C66,79 65,80 64,80 L44,80 C43,80 42,79 42,78 L42,76 C42,75 43,74 44,74 Z" />
+    </group>
+</vector>
